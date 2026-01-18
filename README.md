@@ -99,3 +99,11 @@ Of course, you can delete items:
     True
     >>> api.todo.index()['count']
     1
+
+### Sync with upstream
+
+This repository is a fork. To pull the latest changes from the original repository:
+
+```bash
+./sync-upstream.sh
+```
