@@ -1,9 +1,9 @@
 import os
 import sys
 import uuid
-import urllib
-import urllib2
-import httplib
+import urllib.request
+import urllib.parse
+import http.client
 
 try:
     import simplejson as json
@@ -33,11 +33,11 @@ class Auth(object):
         if not headers:
             headers = {}
         if data:
-            data = urllib.urlencode(data)
-        request = urllib2.Request(url, data, headers=headers)
+            data = urllib.parse.urlencode(data).encode('utf-8')
+        request = urllib.request.Request(url, data, headers=headers)
         if method:
             request.get_method = lambda: method
-        response = urllib2.urlopen(request)
+        response = urllib.request.urlopen(request)
         return response
 
     def create(self, username, password):
@@ -47,8 +47,8 @@ class Auth(object):
             'password': password, }
         try:
             response = self._request(self.appname+'/create/', data)
-            return json.loads(response.read())['access_token']
-        except urllib2.HTTPError:
+            return json.loads(response.read().decode('utf-8'))['access_token']
+        except urllib.error.HTTPError:
             return None
 
     def authorize(self, username, password):
@@ -57,7 +57,7 @@ class Auth(object):
             'username': username,
             'password': password, }
         response = self._request(self.appname+'/authorize/', data)
-        return json.loads(response.read())['access_token']
+        return json.loads(response.read().decode('utf-8'))['access_token']
 
 
 class Bucket(object):
@@ -111,13 +111,12 @@ class Bucket(object):
         url = '%s://%s/1/%s' % (self.scheme, self.host, url)
         if not headers:
             headers = {}
-        request = urllib2.Request(url, data, headers=headers)
+        if data and isinstance(data, str):
+            data = data.encode('utf-8')
+        request = urllib.request.Request(url, data, headers=headers)
         if method:
             request.get_method = lambda: method
-        if sys.version_info < (2, 6):
-            response = urllib2.urlopen(request)
-        else:
-            response = urllib2.urlopen(request, timeout=timeout)
+        response = urllib.request.urlopen(request, timeout=timeout)
         return response
 
     def index(self, data=False, mark=None, limit=None, since=None):
@@ -158,12 +157,12 @@ class Bucket(object):
             args['limit'] = str(limit)
         if since:
             args['since'] = str(since)
-        args = urllib.urlencode(args)
+        args = urllib.parse.urlencode(args)
         if len(args):
             url += '?'+args
 
         response = self._request(url, headers=self._auth_header())
-        return json.loads(response.read())
+        return json.loads(response.read().decode('utf-8'))
 
     def get(self, item, default=None, version=None):
         """retrieves either the latest version of item from this bucket, or the
@@ -173,12 +172,12 @@ class Bucket(object):
             url += '/v/%s' % version
         try:
             response = self._request(url, headers=self._auth_header())
-        except urllib2.HTTPError, e:
+        except urllib.error.HTTPError as e:
             if getattr(e, 'code') == 404:
                 return default
             raise
 
-        return json.loads(response.read())
+        return json.loads(response.read().decode('utf-8'))
 
     def post(self, item, data, version=None, ccid=None, include_response=False, replace=False):
         """posts the supplied data to item
@@ -199,10 +198,10 @@ class Bucket(object):
         data = json.dumps(data)
         try:
             response = self._request(url, data, headers=self._auth_header())
-        except urllib2.HTTPError:
+        except urllib.error.HTTPError:
             return None
         if include_response:
-            return item, json.loads(response.read())
+            return item, json.loads(response.read().decode('utf-8'))
         else:
             return item
 
@@ -242,7 +241,7 @@ class Bucket(object):
             return True
 
         # check each change response for 'error'
-        return json.loads(response.read())
+        return json.loads(response.read().decode('utf-8'))
 
 
     def new(self, data, ccid=None):
@@ -280,14 +279,14 @@ class Bucket(object):
         headers = self._auth_header()
         try:
             response = self._request(url, headers=headers, timeout=timeout)
-        except httplib.BadStatusLine:
+        except http.client.BadStatusLine:
             return []
-        except Exception, e:
+        except Exception as e:
             if any(msg in str(e) for msg in ['timed out', 'Connection refused', 'Connection reset']) or \
                     getattr(e, 'code', None) in [502, 504]:
                 return []
             raise
-        return json.loads(response.read())
+        return json.loads(response.read().decode('utf-8'))
 
     def all(self, cv=None, data=False, username=False, most_recent=False, timeout=None, skip_clientids=[], batch=None):
         """retrieves *all* updates for this bucket, regardless of the user
@@ -323,7 +322,7 @@ class Bucket(object):
         if most_recent:
             url += '&most_recent=1'
         for clientid in skip_clientids:
-            url += '&skip_clientid=%s' % urllib.quote_plus(clientid)
+            url += '&skip_clientid=%s' % urllib.parse.quote_plus(clientid)
         try:
             url += '&batch=%d' % int(batch)
         except:
@@ -331,14 +330,14 @@ class Bucket(object):
         headers = self._auth_header()
         try:
             response = self._request(url, headers=headers, timeout=timeout)
-        except httplib.BadStatusLine:
+        except http.client.BadStatusLine:
             return []
-        except Exception, e:
+        except Exception as e:
             if any(msg in str(e) for msg in ['timed out', 'Connection refused', 'Connection reset']) or \
                     getattr(e, 'code', None) in [502, 504]:
                 return []
             raise
-        return json.loads(response.read())
+        return json.loads(response.read().decode('utf-8'))
 
 
 class SPUser(object):
